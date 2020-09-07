@@ -101,11 +101,6 @@ namespace Calamari.AzureCloudService.Tests
 
                                                          context.WithPackage(pathToPackage, "Octopus.Sample.AzureCloudService", "5.8.2");
                                                      })
-                                        .WithAssert(result =>
-                                                    {
-                                                        result.FullLog.Should().Contain("Hello from C#");
-                                                        result.FullLog.Should().Contain("Hello from F#");
-                                                    })
                                         .Execute();
             }
         }
