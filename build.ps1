@@ -89,5 +89,5 @@ dotnet tool run dotnet-cake --bootstrap
 
 # Start Cake
 Write-Host "Running build script..."
-Invoke-Expression "& dotnet cake `"$Script`" -target=`"$Target`" -configuration=`"$Configuration`" -verbosity=`"$Verbosity`" $UseMono $UseDryRun $UseExperimental $ScriptArgs"
+Invoke-Expression "& dotnet-cake `"$Script`" -target=`"$Target`" -configuration=`"$Configuration`" -verbosity=`"$Verbosity`" $UseMono $UseDryRun $UseExperimental $ScriptArgs"
 exit $LASTEXITCODE
