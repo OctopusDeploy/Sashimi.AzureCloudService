@@ -82,8 +82,6 @@ if($WhatIf.IsPresent) {
     $UseDryRun = "-dryrun"
 }
 
-dotnet tool install --global Cake.Tool --version 0.38.5
-
 # We added this so we can use dotnet tools
 # See https://www.gep13.co.uk/blog/introducing-cake.dotnettool.module
 Write-Host "Installing cake modules using the --bootstrap argument"
@@ -91,5 +89,5 @@ dotnet tool run dotnet-cake --bootstrap
 
 # Start Cake
 Write-Host "Running build script..."
-Invoke-Expression "& dotnet tool run dotnet-cake `"$Script`" -target=`"$Target`" -configuration=`"$Configuration`" -verbosity=`"$Verbosity`" $UseMono $UseDryRun $UseExperimental $ScriptArgs"
+Invoke-Expression "& dotnet cake `"$Script`" -target=`"$Target`" -configuration=`"$Configuration`" -verbosity=`"$Verbosity`" $UseMono $UseDryRun $UseExperimental $ScriptArgs"
 exit $LASTEXITCODE
