@@ -46,8 +46,7 @@ namespace Sashimi.AzureCloudService
                                       Func<string, string> accountIdResolver,
                                       Func<string, string> certificateIdResolver,
                                       Func<string, string> workerPoolIdResolver,
-                                      Func<string,AccountType> accountTypeResolver,
-                                      Func<string,string> feedIdResolver)
+                                      Func<string,AccountType> accountTypeResolver)
         {
             // TODO should this be getting the account id as an Azure specific scoped variable
 
