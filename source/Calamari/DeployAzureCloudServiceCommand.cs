@@ -33,4 +33,33 @@ namespace Calamari.AzureCloudService
             yield return resolver.Create<DeployAzureCloudServicePackageBehaviour>();
         }
     }
+
+    // TODO: Not intended for actual use, this is temporary to allow testing
+    [Command("deploy-azure-cloud-service-repackage", Description = "Extracts and installs an Azure Cloud-Service")]
+    public class DeployAzureCloudServiceRePackageCommand : PipelineCommand
+    {
+        protected override IEnumerable<IBeforePackageExtractionBehaviour> BeforePackageExtraction(BeforePackageExtractionResolver resolver)
+        {
+            yield return resolver.Create<SwapAzureDeploymentBehaviour>();
+
+        }
+
+        protected override IEnumerable<IAfterPackageExtractionBehaviour> AfterPackageExtraction(AfterPackageExtractionResolver resolver)
+        {
+            yield return resolver.Create<FindCloudServicePackageBehaviour>();
+            yield return resolver.Create<EnsureCloudServicePackageIsCtpFormatBehaviour>();
+            yield return resolver.Create<ExtractAzureCloudServicePackageBehaviour>();
+            yield return resolver.Create<ChooseCloudServiceConfigurationFileBehaviour>();
+        }
+
+        protected override IEnumerable<IPreDeployBehaviour> PreDeploy(PreDeployResolver resolver)
+        {
+            yield return resolver.Create<ConfigureAzureCloudServiceBehaviour>();
+        }
+
+        protected override IEnumerable<IDeployBehaviour> Deploy(DeployResolver resolver)
+        {
+            yield return resolver.Create<RePackageCloudServiceBehaviour>();
+        }
+    }
 }

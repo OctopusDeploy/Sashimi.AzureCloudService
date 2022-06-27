@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
 using Calamari.Common.Features.Deployment;
@@ -209,6 +210,143 @@ namespace Calamari.AzureCloudService.Tests
                                                         result.FullLog.Should().Contain("Hello from C#");
                                                         result.FullLog.Should().Contain("Hello from F#");
                                                     })
+                                        .Execute();
+            }
+        }
+        
+        [Test]
+        public async Task Deploy_PackagesInParallelToMultipleServices_To_Stage()
+        {
+            var serviceNames = Enumerable.Range(0, 5).Select(serviceName =>  $"{nameof(DeployAzureCloudServiceCommandFixture)}-{Guid.NewGuid().ToString("N").Substring(0, 12)}").ToList();
+
+            var deploymentSlot = DeploymentSlot.Staging;
+
+            using var client = new ComputeManagementClient(subscriptionCloudCredentials);
+            try
+            {
+                foreach (var serviceName in serviceNames)
+                {
+                    await client.HostedServices.CreateAsync(new HostedServiceCreateParameters(serviceName, "test") { Location = "West US" });
+                }
+                
+                var deploymentTasks = serviceNames.Select(s => Deploy((s)));
+                await Task.WhenAll(deploymentTasks);
+            }
+            finally
+            {
+                var deleteDeploymentTasks = serviceNames.Select(serviceName => DeleteDeployment(client, serviceName, deploymentSlot));
+                await Task.WhenAll(deleteDeploymentTasks);
+                var deleteServicesTasks = serviceNames.Select(serviceName => client.HostedServices.DeleteAsync(serviceName));
+                await Task.WhenAll(deleteServicesTasks);
+            }
+
+            async Task Deploy(string serviceName)
+            {
+                await CommandTestBuilder.CreateAsync<DeployAzureCloudServiceCommand, Program>()
+                                        .WithArrange(context =>
+                                                     {
+                                                         context.Variables.Add(SpecialVariables.Action.Azure.SubscriptionId, subscriptionId);
+                                                         context.Variables.Add(SpecialVariables.Action.Azure.CertificateThumbprint, managementCertificate.Thumbprint);
+                                                         context.Variables.Add(SpecialVariables.Action.Azure.CertificateBytes, certificate);
+                                                         context.Variables.Add(SpecialVariables.Action.Azure.CloudServiceName, serviceName);
+                                                         context.Variables.Add(SpecialVariables.Action.Azure.StorageAccountName, storageName);
+                                                         context.Variables.Add(SpecialVariables.Action.Azure.Slot, deploymentSlot.ToString());
+                                                         context.Variables.Add(SpecialVariables.Action.Azure.SwapIfPossible, bool.FalseString);
+                                                         context.Variables.Add(SpecialVariables.Action.Azure.UseCurrentInstanceCount, bool.FalseString);
+                                                         context.Variables.Add(SpecialVariables.Action.Azure.DeploymentLabel, "v1.0.0");
+
+                                                         context.WithPackage(pathToPackage, "Octopus.Sample.AzureCloudService", "6.0.0");
+                                                     })
+                                        .Execute();
+            }
+        }
+        
+        [Test]
+        public async Task RepackageCloudService_PackagesInParallel_ShouldSucceed()
+        {
+            var serviceName = $"{nameof(DeployAzureCloudServiceCommandFixture)}-{Guid.NewGuid().ToString("N").Substring(0, 12)}";
+            // Tested on seperate instances of rider running the same test on the same service. Could not reproduce.
+            //var serviceName = $"DeployAzureCloudServiceCommandFixture-94027faa67b2";
+            
+            var deploymentSlot = DeploymentSlot.Staging;
+
+            using var client = new ComputeManagementClient(subscriptionCloudCredentials);
+            try
+            {
+                await client.HostedServices.CreateAsync(new HostedServiceCreateParameters(serviceName, "test") { Location = "West US" });
+                var preDeployTasks = Enumerable.Range(0, 5).Select(s => PreDeployAndRePackage(serviceName));
+                await Task.WhenAll(preDeployTasks);
+            }
+            catch (Exception e)
+            {
+                var test = e;
+            }
+            finally
+            {
+                await DeleteDeployment(client, serviceName, deploymentSlot);
+                await client.HostedServices.DeleteAsync(serviceName);
+            }
+
+            async Task PreDeployAndRePackage(string serviceName)
+            {
+                await CommandTestBuilder.CreateAsync<DeployAzureCloudServiceRePackageCommand, Program>()
+                                        .WithArrange(context =>
+                                                     {
+                                                         context.Variables.Add(SpecialVariables.Action.Azure.SubscriptionId, subscriptionId);
+                                                         context.Variables.Add(SpecialVariables.Action.Azure.CertificateThumbprint, managementCertificate.Thumbprint);
+                                                         context.Variables.Add(SpecialVariables.Action.Azure.CertificateBytes, certificate);
+                                                         context.Variables.Add(SpecialVariables.Action.Azure.CloudServiceName, serviceName);
+                                                         context.Variables.Add(SpecialVariables.Action.Azure.StorageAccountName, storageName);
+                                                         context.Variables.Add(SpecialVariables.Action.Azure.Slot, deploymentSlot.ToString());
+                                                         context.Variables.Add(SpecialVariables.Action.Azure.SwapIfPossible, bool.FalseString);
+                                                         context.Variables.Add(SpecialVariables.Action.Azure.UseCurrentInstanceCount, bool.FalseString);
+                                                         context.Variables.Add(SpecialVariables.Action.Azure.DeploymentLabel, "v1.0.0");
+
+                                                         context.WithPackage(pathToPackage, "Octopus.Sample.AzureCloudService", "6.0.0");
+                                                     })
+                                        .Execute();
+            }
+        }
+
+        [Test]
+        public async Task Deploy_PackagesInParallelToSingleService_To_Stage()
+        {
+            var serviceName = $"{nameof(DeployAzureCloudServiceCommandFixture)}-{Guid.NewGuid().ToString("N").Substring(0, 12)}";
+
+            var deploymentSlot = DeploymentSlot.Staging;
+
+            using var client = new ComputeManagementClient(subscriptionCloudCredentials);
+            try
+            {
+                await client.HostedServices.CreateAsync(new HostedServiceCreateParameters(serviceName, "test") { Location = "West US" });
+                var firstDeployment = Deploy();
+                var secondDeployment = Deploy();
+
+                await Task.WhenAll(firstDeployment, secondDeployment);
+            }
+            finally
+            {
+                await DeleteDeployment(client, serviceName, deploymentSlot);
+                await client.HostedServices.DeleteAsync(serviceName);
+            }
+
+            async Task Deploy()
+            {
+                await CommandTestBuilder.CreateAsync<DeployAzureCloudServiceCommand, Program>()
+                                        .WithArrange(context =>
+                                                     {
+                                                         context.Variables.Add(SpecialVariables.Action.Azure.SubscriptionId, subscriptionId);
+                                                         context.Variables.Add(SpecialVariables.Action.Azure.CertificateThumbprint, managementCertificate.Thumbprint);
+                                                         context.Variables.Add(SpecialVariables.Action.Azure.CertificateBytes, certificate);
+                                                         context.Variables.Add(SpecialVariables.Action.Azure.CloudServiceName, serviceName);
+                                                         context.Variables.Add(SpecialVariables.Action.Azure.StorageAccountName, storageName);
+                                                         context.Variables.Add(SpecialVariables.Action.Azure.Slot, deploymentSlot.ToString());
+                                                         context.Variables.Add(SpecialVariables.Action.Azure.SwapIfPossible, bool.FalseString);
+                                                         context.Variables.Add(SpecialVariables.Action.Azure.UseCurrentInstanceCount, bool.FalseString);
+                                                         context.Variables.Add(SpecialVariables.Action.Azure.DeploymentLabel, "v1.0.0");
+
+                                                         context.WithPackage(pathToPackage, "Octopus.Sample.AzureCloudService", "6.0.0");
+                                                     })
                                         .Execute();
             }
         }
